@@ -1,6 +1,5 @@
-import type { Booking } from '../models/booking'
+import type { Booking, BookingStatusRequest } from '../models/booking'
 
-// Заготовка компонента. Рабочие обычные карточки находятся в legacy-card.ts.
 export class BookingCard extends HTMLElement {
   private current: Booking | null = null
   private nameText = document.createElement('h3')
@@ -24,13 +23,13 @@ export class BookingCard extends HTMLElement {
     const article = document.createElement('article')
     this.button.type = 'button'
     article.append(this.nameText, this.seatsText, this.sourceText, this.statusText, this.button)
-    // А1: создайте открытый shadow root, поместите в него style и article.
-    // А2: отобразите начальное состояние без данных.
+    this.attachShadow({ mode: 'open' }).append(style, article)
+    this.render()
   }
 
   set booking(value: Booking) {
-    // А2: примите данные и обновите отображение.
-    void value
+    this.current = value
+    this.render()
   }
 
   private render() {
@@ -44,23 +43,37 @@ export class BookingCard extends HTMLElement {
       this.button.disabled = true
       return
     }
-    // А2: имя, участники, источник, статус и кнопка для обоих состояний.
+    const confirmed = booking.status === 'confirmed'
+    this.nameText.textContent = booking.name
+    this.seatsText.textContent = `Участников: ${booking.seats}`
+    this.sourceText.textContent = `Источник: ${booking.source}`
+    this.statusText.textContent = confirmed ? 'Подтверждена' : 'Новая заявка'
+    this.button.textContent = confirmed ? 'Вернуть в очередь' : 'Подтвердить'
+    this.button.disabled = false
   }
 
   private onAction = () => {
-    if (!this.current) return
-    // А3: запросите следующий статус публичным событием.
-    // Подтверждённая заявка тоже интерактивна: здесь нет запрета confirmed.
+    const booking = this.current
+    if (!booking) return
+
+    this.dispatchEvent(new CustomEvent<BookingStatusRequest>('booking-status-request', {
+      bubbles: true,
+      detail: {
+        id: booking.id,
+        nextStatus: booking.status === 'new' ? 'confirmed' : 'new',
+      },
+    }))
   }
 
   connectedCallback() {
-    // А4: подключите обработчик внутренней кнопки.
+    this.button.addEventListener('click', this.onAction)
   }
 
   disconnectedCallback() {
-    // А4: снимите этот же обработчик.
+    this.button.removeEventListener('click', this.onAction)
   }
 }
 
-// А1: зарегистрируйте booking-card.
+customElements.define('booking-card', BookingCard)
+
 // Д1: реакция на compact. Д2: слот note. Д3: сохранение узлов и тема.
